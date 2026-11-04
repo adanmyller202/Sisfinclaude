@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Clock,
   CheckCheck,
+  Trash2,
 } from 'lucide-react';
 
 interface SharedNotificationsModalProps {
@@ -30,6 +31,7 @@ interface SharedNotificationsModalProps {
   onRejectShareBillRequest?: (billId: string) => Promise<void>;
   onMarkRead: (notifId: string) => Promise<void>;
   onMarkAllRead: () => Promise<void>;
+  onClearNotifications: () => Promise<void>;
 }
 
 export const SharedNotificationsModal: React.FC<SharedNotificationsModalProps> = ({
@@ -44,6 +46,7 @@ export const SharedNotificationsModal: React.FC<SharedNotificationsModalProps> =
   onRejectShareBillRequest,
   onMarkRead,
   onMarkAllRead,
+  onClearNotifications,
 }) => {
   const t = getTranslations(language);
 
@@ -114,6 +117,23 @@ export const SharedNotificationsModal: React.FC<SharedNotificationsModalProps> =
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                 onClick={() => {
+                    if (confirm('Tem certeza que deseja limpar suas notificações?')) {
+                      onClearNotifications();
+                    }
+                 }}
+                 className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
+                 title="Limpar notificações"
+               >
+                 <Trash2 className="w-3.5 h-3.5" />
+                 <span className="hidden sm:inline">Limpar</span>
+               </button>
+
+
+            )}
             {notifications.some((n) => !n.isRead) && (
               <button
                 type="button"

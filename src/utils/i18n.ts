@@ -655,9 +655,12 @@ export const TRANSLATIONS = {
     markAllRead: 'Marcar todas como lidas',
     shareThisBillPrompt: 'Compartilhar esta fatura/gasto?',
     selectPartnerToShare: 'Selecione o parceiro de compartilhamento',
-    monthFilterLabel: 'Filtrar por mês:',
+    confirmClearNotifications: 'Tem certeza que deseja limpar suas notificações?',
+    clearNotifications: 'Limpar notificações',
+  },
 
-    // Desafio de 52 Semanas
+
+
     challenge52Title: 'Desafio de 52 Semanas',
     challenge52Subtitle: 'Aposte no seu futuro economizando um valor crescente a cada semana do ano.',
     challenge52InitialAmount: 'Valor Inicial Semanal (Semana 1) *',

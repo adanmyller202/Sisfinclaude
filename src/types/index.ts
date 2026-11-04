@@ -361,6 +361,7 @@ export interface SharedTransferRecord {
   type: 'share_transfer' | 'reimbursement';
   status: 'completed';
   createdAt: string;
+  hiddenForUsers?: string[];
 }
 
 export type SharedNotificationType =

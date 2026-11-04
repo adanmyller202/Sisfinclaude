@@ -264,4 +264,13 @@ div[role="dialog"] {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .financial-calendar-day-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgba(209, 250, 235, 0.55);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
 }

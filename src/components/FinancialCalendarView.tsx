@@ -363,8 +363,14 @@ export const FinancialCalendarView: React.FC<FinancialCalendarViewProps> = ({
       {/* Day Detail Modal */}
       <AnimatePresence>
         {isDayDetailModalOpen && selectedDayData && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 glass-overlay" onClick={() => setIsDayDetailModalOpen(false)} />
+          <div className="fixed inset-0 z-[100] isolate flex items-end sm:items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="financial-calendar-day-backdrop"
+              onClick={() => setIsDayDetailModalOpen(false)}
+            />
             <motion.div
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}

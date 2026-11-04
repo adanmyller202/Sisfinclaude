@@ -22,6 +22,8 @@ import { InvitePartnerModal } from './InvitePartnerModal';
 import { SharedBillModal } from './SharedBillModal';
 import { TransferConfirmationModal } from './TransferConfirmationModal';
 import { SharedNotificationsModal } from './SharedNotificationsModal';
+import { StopSharingModal } from './StopSharingModal';
+
 import {
   Users,
   UserPlus,
@@ -106,7 +108,12 @@ interface SharedAccountsViewProps {
   onRespondShareBillRequest?: (billId: string, accept: boolean) => Promise<void>;
   onMarkNotificationRead: (notifId: string) => Promise<void>;
   onMarkAllNotificationsRead: () => Promise<void>;
+  onClearNotifications: () => Promise<void>;
+  onClearTransfers: () => Promise<void>;
+  onStopSharingAndConvert: (connectionId: string, options: { conversionRule: 'total' | 'my_share'; recurrenceScope: 'this_month' | 'future' }) => Promise<void>;
+  onToggleMySharePaid: (billId: string, isPaid: boolean, month: string) => Promise<void>;
   onReturnToFinance?: () => void;
+
   getCategoriesFor?: (scope: 'bill' | 'income' | 'expense' | 'all') => string[];
   onAddCategory?: (name: string, scope: CategoryScope) => Promise<unknown>;
   isProcessing?: boolean;
@@ -116,6 +123,7 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
   currency,
   language = 'pt',
   myUserId,
+  connections,
   activePartners,
   receivedInvitations,
   sentInvitations,
@@ -136,11 +144,18 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
   onRespondShareBillRequest,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  onClearNotifications,
+  onClearTransfers,
+  onStopSharingAndConvert,
+  onToggleMySharePaid,
   onReturnToFinance,
   getCategoriesFor,
   onAddCategory,
   isProcessing,
 }) => {
+
+
+
   const t = getTranslations(language);
 
   // Active sub-tab: 'bills' | 'statement'
@@ -152,6 +167,8 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<SharedBill | null>(null);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isStopSharingModalOpen, setIsStopSharingModalOpen] = useState(false);
+  const [partnerToStopSharing, setPartnerToStopSharing] = useState<SharedUserSummary | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [reimbursementBillToSettle, setReimbursementBillToSettle] = useState<SharedBill | null>(null);
   const [billToPayFull, setBillToPayFull] = useState<SharedBill | null>(null);
@@ -391,24 +408,42 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
               {t.noPartnersYet}
             </span>
           ) : (
-            activePartners.map((partner) => (
-              <div
-                key={partner.uid}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200/80 text-xs shadow-2xs"
-              >
-                <div className="w-5 h-5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] flex items-center justify-center">
-                  {partner.displayName.charAt(0).toUpperCase()}
+            activePartners.map((partner) => {
+              const partnerConnection = connections.find(c => c.members.includes(partner.uid));
+              return (
+                <div
+                  key={partner.uid}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200/80 text-xs shadow-2xs"
+                >
+                  <div className="w-5 h-5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] flex items-center justify-center">
+                    {partner.displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-bold text-slate-800">
+                    {partner.displayName}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                    ({partner.email})
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
+                  {partnerConnection && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPartnerToStopSharing(partner);
+                        setIsStopSharingModalOpen(true);
+                      }}
+                      className="ml-2 p-1 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Parar de compartilhar"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                 </div>
-                <span className="font-bold text-slate-800">
-                  {partner.displayName}
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
-                  ({partner.email})
-                </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
-              </div>
-            ))
+              );
+            })
           )}
+
         </div>
       </div>
 
@@ -762,18 +797,19 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
                         </div>
 
                         {/* Action buttons */}
-                        <div className="flex items-center gap-1.5">
-                          {/* Single Transfer Button */}
-                          {canSelectForTransfer && (
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {/* Pay My Share */}
+                          {!isPaidToCreditor && myShare?.status === 'pending' && (
                             <button
                               type="button"
                               disabled={isProcessing}
-                              onClick={() => handleTransferSingle(bill.id)}
-                              className="px-2.5 py-1.5 rounded-xl border border-emerald-500/80 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
-                              title="Transferir apenas minha parte para o parceiro"
+                              onClick={() => onToggleMySharePaid(bill.id, true, selectedMonth)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                              title="Marcar minha participação como paga"
                             >
-                              {t.transferMyShare}
+                              {language === 'es' ? `Pagar Mi Parte - ${formatCurrency(myShare.amount, currency)}` : `Pagar Minha Parte - ${formatCurrency(myShare.amount, currency)}`}
                             </button>
+
                           )}
 
                           {/* Quitar Reembolso (if debtor) */}
@@ -789,16 +825,22 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
                           )}
 
                           {/* Pay Full Bill to Creditor */}
-                          {!isPaidToCreditor && !iTransferredMyShare && (
-                            <button
-                              type="button"
-                              disabled={isProcessing}
-                              onClick={() => setBillToPayFull(bill)}
-                              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
-                              title={t.payFullBillDesc}
-                            >
-                              {t.payFullBill}
-                            </button>
+                          {bill.status === 'pending' && !isPaidToCreditor && (
+                            partnerShare?.status === 'paid' ? (
+                              <div className="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                {partnerName} {language === 'es' ? 'ya pagó su parte' : 'já pagou a parte dele'}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => setBillToPayFull(bill)}
+                                className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                                title={t.payFullBillDesc}
+                              >
+                                {t.payFullBill}
+                              </button>
+                            )
                           )}
 
                           {/* Edit Bill */}
@@ -840,9 +882,23 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
       {activeTab === 'statement' && (
         <div className="space-y-3">
           <div className="p-3 sm:p-4 rounded-3xl glass-card border border-white/80 space-y-3">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800">
-              {t.statementTab}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800">
+                {t.statementTab}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                   if (confirm(language === 'es' ? '¿Deseas limpiar tu extrato?' : 'Deseja limpar seu extrato?')) {
+                     onClearTransfers();
+                   }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200/80 hover:border-rose-200 transition-all text-[10px] font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{language === 'es' ? 'Limpiar extrato' : 'Limpar extrato'}</span>
+              </button>
+            </div>
 
             {sharedTransfers.length === 0 ? (
               <div className="text-center py-10 text-slate-400 text-xs">
@@ -1014,6 +1070,7 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
         }
         onMarkRead={onMarkNotificationRead}
         onMarkAllRead={onMarkAllNotificationsRead}
+        onClearNotifications={onClearNotifications}
       />
 
       {/* Reimbursement Confirmation Modal */}
@@ -1212,6 +1269,22 @@ export const SharedAccountsView: React.FC<SharedAccountsViewProps> = ({
           </div>
         </div>
       )}
+      <StopSharingModal
+        isOpen={isStopSharingModalOpen}
+        onClose={() => setIsStopSharingModalOpen(false)}
+        partnerName={partnerToStopSharing?.displayName || ''}
+        language={language}
+        isProcessing={isProcessing || false}
+        onConfirm={async (options) => {
+          if (!partnerToStopSharing) return;
+          const conn = connections.find(c => c.members.includes(partnerToStopSharing.uid));
+          if (conn) {
+            await onStopSharingAndConvert(conn.id, options);
+            setIsStopSharingModalOpen(false);
+          }
+        }}
+      />
     </div>
   );
 };
+

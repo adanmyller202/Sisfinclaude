@@ -26,12 +26,11 @@ service cloud.firestore {
       return val is number && val >= minVal && val <= maxVal;
     }
 
-    // Helper to verify bilateral connection exists between two distinct users
+    // Helper to verify bilateral connection exists and is active between two distinct users
     function hasActiveConnection(userA, userB) {
-      return userA != userB && (
-        exists(/databases/$(database)/documents/shared_connections/$( 'conn_' + userA + '_' + userB )) ||
-        exists(/databases/$(database)/documents/shared_connections/$( 'conn_' + userB + '_' + userA ))
-      );
+      let connectionId = (userA < userB) ? ('conn_' + userA + '_' + userB) : ('conn_' + userB + '_' + userA);
+      let connection = get(/databases/$(database)/documents/shared_connections/$(connectionId));
+      return connection != null && connection.data.status == 'active';
     }
 
     // Helper ensuring hiddenForUsers can only add/remove the caller's own UID
@@ -108,7 +107,7 @@ service cloud.firestore {
         request.resource.data.members is list &&
         request.resource.data.members.size() == 2 &&
         request.auth.uid in request.resource.data.members &&
-        request.resource.data.status in ['active', 'pending', 'inactive'];
+        request.resource.data.status in ['active', 'pending', 'inactive', 'cancelled'];
 
       allow update: if isSignedIn() &&
         request.auth.uid in resource.data.members &&
@@ -141,7 +140,13 @@ service cloud.firestore {
         request.resource.data.id == resource.data.id &&
         request.resource.data.fromUserId == resource.data.fromUserId &&
         request.resource.data.toUserId == resource.data.toUserId &&
-        request.resource.data.status in ['pending', 'accepted', 'rejected', 'canceled'];
+        // State machine restrictions
+        resource.data.status == 'pending' &&
+        (request.resource.data.status in ['accepted', 'rejected', 'canceled']) &&
+        // If accepted/rejected, only toUserId allowed
+        ((request.resource.data.status in ['accepted', 'rejected']) ? request.auth.uid == resource.data.toUserId : true) &&
+        // If canceled, only fromUserId allowed
+        ((request.resource.data.status == 'canceled') ? request.auth.uid == resource.data.fromUserId : true);
 
       allow delete: if isSignedIn() && (
         resource.data.fromUserId == request.auth.uid ||
@@ -149,7 +154,7 @@ service cloud.firestore {
       );
     }
 
-    // 7. Shared Bills (Global delete permitted ONLY by createdBy; strict hiddenForUsers guard)
+    // 7. Shared Bills
     match /shared_bills/{billId} {
       allow read: if isSignedIn() && request.auth.uid in resource.data.members;
 
@@ -169,15 +174,18 @@ service cloud.firestore {
         request.resource.data.id == resource.data.id &&
         request.resource.data.createdBy == resource.data.createdBy &&
         request.resource.data.members == resource.data.members &&
-        isSafeNumber(request.resource.data.amount, 0.01, 1000000000) &&
-        isSafeString(request.resource.data.title, 1, 200) &&
-        isValidHiddenForUsersUpdate();
+        // Only allow updating payment status, reimbursements, or hiddenForUsers
+        (
+          // Allow payment status updates (e.g. paying one's part)
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shares', 'status', 'paidBy', 'paidAt', 'paidAmount', 'reimbursement', 'exceptions', 'updatedAt']) ||
+          // Allow hiddenForUsers updates
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForUsers', 'updatedAt']) && isValidHiddenForUsersUpdate())
+        );
 
-      // CRITICAL: ONLY createdBy can permanently delete the shared bill document for everyone
       allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy;
     }
 
-    // 8. Shared Transfers (Extrato) - Absolute immutability once created
+    // 8. Shared Transfers - Allow adding hiddenForUsers
     match /shared_transfers/{transferId} {
       allow read: if isSignedIn() && (
         resource.data.fromUserId == request.auth.uid ||
@@ -191,11 +199,14 @@ service cloud.firestore {
         request.resource.data.toUserId is string &&
         request.resource.data.toUserId != request.auth.uid &&
         isSafeNumber(request.resource.data.amount, 0.01, 1000000000) &&
-        request.resource.data.status in ['completed', 'pending'] &&
-        request.resource.data.type in ['share_transfer', 'reimbursement'] &&
+        request.resource.data.status == 'completed' &&
         hasActiveConnection(request.auth.uid, request.resource.data.toUserId);
 
-      allow update, delete: if false;
+      allow update: if isSignedIn() &&
+        (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForUsers']);
+
+      allow delete: if false;
     }
 
     // 9. Shared Notifications
@@ -211,7 +222,8 @@ service cloud.firestore {
         request.resource.data.type in [
           'invitation_received', 'invitation_accepted', 'invitation_rejected',
           'bill_created', 'bill_updated', 'bill_paid',
-          'transfer_received', 'share_bill_request', 'share_bill_accepted', 'share_bill_rejected'
+          'transfer_received', 'share_bill_request', 'share_bill_accepted', 'share_bill_rejected',
+          'reimbursement_created'
         ] &&
         isSafeString(request.resource.data.title, 1, 200) &&
         isSafeString(request.resource.data.message, 1, 1000);
@@ -220,11 +232,11 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid &&
         request.resource.data.id == resource.data.id &&
         request.resource.data.userId == resource.data.userId &&
-        request.resource.data.fromUserId == resource.data.fromUserId &&
-        request.resource.data.type == resource.data.type;
+        request.resource.data.isRead == true; // Only allow marking as read
 
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid; // Allow deleting own notifications
     }
+
 
     // 10. Password Resets (Server-side handled via REST)
     match /password_resets/{resetId} {

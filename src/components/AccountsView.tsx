@@ -24,6 +24,7 @@ import {
   Landmark,
   RotateCcw,
 } from 'lucide-react';
+import { BankLogo } from './BankLogo';
 
 interface AccountsViewProps {
   currency: CurrencyCode;
@@ -188,7 +189,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
                   <motion.div key={acc.id} variants={itemVariants} className={`glass-card rounded-[2.5rem] p-6 border transition-all flex flex-col justify-between group overflow-hidden ${isInactive ? 'opacity-40 grayscale' : 'border-white/80 hover:border-emerald-500/40 shadow-md'}`}>
                     <div className="flex items-start justify-between mb-8">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-white/90 border border-slate-200/60 flex items-center justify-center text-3xl shadow-xs group-hover:scale-110 transition-transform">{typeCfg.emoji}</div>
+                        <BankLogo name={acc.name} type={acc.type} size="md" fallbackEmoji={typeCfg.emoji} />
                         <div>
                           <h4 className="text-lg font-black text-slate-900 leading-none">{acc.name}</h4>
                           <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-2 block">{typeCfg.label[language] || typeCfg.label.pt}</span>

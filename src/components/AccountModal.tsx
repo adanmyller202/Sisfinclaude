@@ -15,6 +15,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
+import { BankLogo } from './BankLogo';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -65,13 +66,30 @@ export const ACCOUNT_TYPE_CONFIG: Record<
 
 const SUGGESTED_NAMES = [
   'Efectivo',
-  'Banco Galicia',
+  'Banco Nación',
+  'Galicia',
   'Santander',
   'BBVA',
+  'Macro',
+  'Provincia',
+  'Ciudad',
+  'ICBC',
+  'HSBC',
+  'Credicoop',
+  'Patagonia',
+  'Supervielle',
+  'Hipotecario',
+  'Itaú',
+  'Brubank',
+  'Naranja X',
   'Mercado Pago',
+  'Ualá',
+  'Personal Pay',
+  'Lemon',
+  'Belo',
+  'Prex',
   'Nubank',
   'Bradesco',
-  'Itaú',
   'Caixa',
 ];
 
@@ -181,9 +199,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <motion.div 
                     initial={{ rotate: -10, scale: 0.8 }}
                     animate={{ rotate: 0, scale: 1 }}
-                    className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-inner border border-emerald-500/20"
+                    className="w-14 h-14 rounded-2xl bg-white shadow-inner border border-emerald-500/20 overflow-hidden flex items-center justify-center"
                   >
-                    {ACCOUNT_TYPE_CONFIG[type]?.emoji || '🏦'}
+                    <BankLogo name={name} type={type} size="md" fallbackEmoji={ACCOUNT_TYPE_CONFIG[type]?.emoji || '🏦'} />
                   </motion.div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight tracking-tight">
@@ -259,13 +277,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                   {/* Suggestions */}
                   <div className="flex items-center gap-2 flex-wrap px-1">
-                    {SUGGESTED_NAMES.slice(0, 7).map((sName) => (
+                    {SUGGESTED_NAMES.slice(0, 10).map((sName) => (
                       <button
                         key={sName}
                         type="button"
                         onClick={() => setName(sName)}
-                        className="px-3 py-1.5 text-[9px] font-black rounded-lg bg-emerald-50 text-slate-600 hover:text-emerald-700 hover:bg-emerald-100/70 transition-all cursor-pointer uppercase tracking-widest border border-emerald-100"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-lg bg-emerald-50 text-slate-600 hover:text-emerald-700 hover:bg-emerald-100/70 transition-all cursor-pointer uppercase tracking-widest border border-emerald-100"
                       >
+                        <BankLogo name={sName} type={type} size="sm" fallbackEmoji="" />
                         {sName}
                       </button>
                     ))}

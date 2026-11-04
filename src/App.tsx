@@ -795,35 +795,40 @@ export default function App() {
                       </p>
                     </div>
                   ) : (
-                    <SharedAccountsView
-                      currency={activeCurrency}
-                      language={currentLang}
-                      myUserId={user.uid}
-                      connections={sharedAccounts.connections}
-                      activePartners={sharedAccounts.activePartners}
-                      receivedInvitations={sharedAccounts.receivedInvitations}
-                      sentInvitations={sharedAccounts.sentInvitations}
-                      sharedBills={sharedAccounts.sharedBills}
-                      sharedTransfers={sharedAccounts.sharedTransfers}
-                      sharedNotifications={sharedAccounts.sharedNotifications}
-                      unreadNotificationsCount={sharedAccounts.unreadNotificationsCount}
-                      pendingReceivedInvitationsCount={sharedAccounts.pendingReceivedInvitationsCount}
-                      onSendInvitation={sharedAccounts.sendInvitation}
-                      onRespondInvitation={sharedAccounts.respondInvitation}
-                      onCreateSharedBill={sharedAccounts.createSharedBill}
-                      onUpdateSharedBill={sharedAccounts.updateSharedBill}
-                      onTransferShares={sharedAccounts.transferShares}
-                      onPayFullBillToCreditor={sharedAccounts.payFullBillToCreditor}
-                      onSettleReimbursement={sharedAccounts.settleReimbursement}
-                      onDeleteSharedBill={sharedAccounts.deleteSharedBill}
-                      onDeleteSharedBillOccurrence={sharedAccounts.deleteSharedBillOccurrence}
-                      onRespondShareBillRequest={sharedAccounts.respondShareBillRequest}
-                      onMarkNotificationRead={sharedAccounts.markNotificationRead}
-                      onMarkAllNotificationsRead={sharedAccounts.markAllNotificationsRead}
-                      onReturnToFinance={() => setCurrentView('finance')}
-                      getCategoriesFor={getCategoriesFor}
-                      onAddCategory={addCategory}
-                    />
+                      <SharedAccountsView
+                        currency={activeCurrency}
+                        language={currentLang}
+                        myUserId={user.uid}
+                        connections={sharedAccounts.connections}
+                        activePartners={sharedAccounts.activePartners}
+                        receivedInvitations={sharedAccounts.receivedInvitations}
+                        sentInvitations={sharedAccounts.sentInvitations}
+                        sharedBills={sharedAccounts.sharedBills}
+                        sharedTransfers={sharedAccounts.sharedTransfers}
+                        sharedNotifications={sharedAccounts.sharedNotifications}
+                        unreadNotificationsCount={sharedAccounts.unreadNotificationsCount}
+                        pendingReceivedInvitationsCount={sharedAccounts.pendingReceivedInvitationsCount}
+                        onSendInvitation={sharedAccounts.sendInvitation}
+                        onRespondInvitation={sharedAccounts.respondInvitation}
+                        onCreateSharedBill={sharedAccounts.createSharedBill}
+                        onUpdateSharedBill={sharedAccounts.updateSharedBill}
+                        onTransferShares={sharedAccounts.transferShares}
+                        onPayFullBillToCreditor={sharedAccounts.payFullBillToCreditor}
+                        onSettleReimbursement={sharedAccounts.settleReimbursement}
+                        onDeleteSharedBill={sharedAccounts.deleteSharedBill}
+                        onDeleteSharedBillOccurrence={sharedAccounts.deleteSharedBillOccurrence}
+                        onRespondShareBillRequest={sharedAccounts.respondShareBillRequest}
+                        onMarkNotificationRead={sharedAccounts.markNotificationRead}
+                        onMarkAllNotificationsRead={sharedAccounts.markAllNotificationsRead}
+                        onClearNotifications={sharedAccounts.clearNotifications}
+                        onClearTransfers={sharedAccounts.clearTransfers}
+                        onStopSharingAndConvert={sharedAccounts.stopSharingAndConvert}
+                        onToggleMySharePaid={sharedAccounts.toggleMySharePaid}
+                        onReturnToFinance={() => setCurrentView('finance')}
+                        getCategoriesFor={getCategoriesFor}
+                        onAddCategory={addCategory}
+                      />
+
                   )
                 ) : currentView === 'challenge_52' ? (
                   <FiftyTwoWeekChallengeView
@@ -934,8 +939,7 @@ export default function App() {
                     onToggleBillPaidCustom={async (billId, month, isPaid) => {
                       if (billId.startsWith('sb_')) {
                         const realId = billId.replace('sb_', '');
-                        await sharedAccounts.toggleSharePaid(realId, isPaid, month);
-                        await toggleBillPaid(billId, month, isPaid);
+                        await sharedAccounts.toggleMySharePaid(realId, isPaid, month);
                       } else {
                         await toggleBillPaid(billId, month, isPaid);
                       }

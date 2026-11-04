@@ -112,12 +112,12 @@ export const NavigationDrawerModal: React.FC<NavigationDrawerModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-start overflow-hidden overscroll-contain pointer-events-none">
+        <div className="fixed inset-0 z-[60] flex items-stretch justify-start overflow-hidden overscroll-contain pointer-events-none">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 solid-overlay pointer-events-auto"
+            className="absolute inset-0 z-0 bg-slate-900/40 pointer-events-auto"
             onClick={onClose}
           />
 
@@ -126,7 +126,7 @@ export const NavigationDrawerModal: React.FC<NavigationDrawerModalProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="solid-container w-full max-w-[320px] sm:max-w-sm flex flex-col h-full relative z-10 pt-safe pb-safe pointer-events-auto"
+            className="solid-container bg-white w-full max-w-[320px] sm:max-w-sm flex flex-col h-full relative z-10 pt-safe pb-safe pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -244,7 +244,7 @@ export const NavigationDrawerModal: React.FC<NavigationDrawerModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200/60 bg-white/40 space-y-3 shrink-0">
+            <div className="p-4 border-t border-slate-200 bg-white space-y-3 shrink-0">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => { onClose(); onOpenSettingsModal(); }}

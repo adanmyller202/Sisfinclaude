@@ -1193,7 +1193,7 @@ export function useSharedAccounts() {
 
 
   // Toggle my share status as paid/pending
-  const toggleSharePaid = useCallback(
+  const toggleMySharePaid = useCallback(
     async (billId: string, isPaid: boolean, targetMonth?: string): Promise<void> => {
       if (!userId) throw new Error('Usuário não autenticado.');
       const bill = sharedBills.find((b) => b.id === billId);
@@ -1205,18 +1205,6 @@ export function useSharedAccounts() {
       const existingReimb = existingException.reimbursement || (bill.recurrence === 'none' ? bill.reimbursement : null);
 
       const now = new Date().toISOString();
-      const updatedShares = {
-        ...bill.shares,
-        [userId]: {
-          ...bill.shares[userId],
-          status: isPaid ? ('paid' as const) : ('pending' as const),
-        },
-      };
-
-      const payload: any = {
-        shares: updatedShares,
-        updatedAt: now,
-      };
 
       const updatedExceptionObj: any = {
         ...existingException,
@@ -1236,29 +1224,41 @@ export function useSharedAccounts() {
           status: isPaid ? 'settled' : 'pending',
           settledAt: isPaid ? now : undefined,
         };
-        if (bill.recurrence === 'none') {
-          payload.reimbursement = {
-            ...existingReimb,
-            status: isPaid ? 'settled' : 'pending',
-            settledAt: isPaid ? now : undefined,
-          };
-        }
       }
 
-      if (effectiveMonth) {
-        payload.exceptions = {
+      const payload: any = {
+        exceptions: {
           ...(bill.exceptions || {}),
           [effectiveMonth]: updatedExceptionObj,
-        };
-      }
+        },
+        updatedAt: now,
+      };
 
       try {
         await setDoc(doc(db, 'shared_bills', billId), sanitizeForFirestore(payload), { merge: true });
+        
+        // Notify partner
+        const partnerId = bill.members.find((m) => m !== userId);
+        if (partnerId) {
+            const notifId = `notif_paid_${billId}_${effectiveMonth}_${Date.now()}`;
+            await setDoc(doc(db, 'shared_notifications', notifId), sanitizeForFirestore({
+              id: notifId,
+              userId: partnerId,
+              fromUserId: userId,
+              fromUserName: user?.displayName || 'Usuário',
+              type: 'bill_paid',
+              title: isPaid ? 'Parte da fatura paga' : 'Pagamento de parte da fatura revertido',
+              message: isPaid ? `Eu marquei minha parte da fatura "${bill.title}" (${effectiveMonth}) como paga.` : `Marquei minha parte da fatura "${bill.title}" (${effectiveMonth}) como pendente novamente.`,
+              isRead: false,
+              status: 'resolved',
+              createdAt: now,
+            }));
+        }
       } catch (err: any) {
         handleFirestoreError(err, OperationType.UPDATE, `shared_bills/${billId}`);
       }
     },
-    [userId, sharedBills]
+    [userId, sharedBills, user]
   );
 
 
@@ -1412,13 +1412,104 @@ export function useSharedAccounts() {
     }
   }, [userId, sharedNotifications]);
 
-  return {
+  const clearNotifications = useCallback(async (): Promise<void> => {
+    if (!userId) return;
+    try {
+      const q = query(collection(db, 'shared_notifications'), where('userId', '==', userId));
+      const snap = await getDocs(q);
+      const promises = snap.docs.map((d) => deleteDoc(d.ref));
+      await Promise.all(promises);
+      setSharedNotifications([]);
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.DELETE, 'shared_notifications');
+    }
+  }, [userId]);
+
+  const clearTransfers = useCallback(async (): Promise<void> => {
+    if (!userId) return;
+    try {
+      const q = query(collection(db, 'shared_transfers'), where('toUserId', '==', userId)); // simplified - would need fromUserId too
+      // Better: filter in UI for now, just mark as hidden locally? 
+      // Actually, need to iterate all where fromUserId == userId OR toUserId == userId.
+      const qFrom = query(collection(db, 'shared_transfers'), where('fromUserId', '==', userId));
+      const qTo = query(collection(db, 'shared_transfers'), where('toUserId', '==', userId));
+      
+      const snapFrom = await getDocs(qFrom);
+      const snapTo = await getDocs(qTo);
+      
+      const promises = [...snapFrom.docs, ...snapTo.docs].map((d) => {
+        const data = d.data() as SharedTransferRecord;
+        const hidden = data.hiddenForUsers || [];
+        if (!hidden.includes(userId)) {
+           return setDoc(d.ref, { hiddenForUsers: [...hidden, userId] }, { merge: true });
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(promises);
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, 'shared_transfers');
+    }
+  }, [userId]);
+
+  const stopSharingAndConvert = useCallback(
+    async (
+      connectionId: string,
+      options: { conversionRule: 'total' | 'my_share'; recurrenceScope: 'this_month' | 'future' }
+    ): Promise<void> => {
+      if (!userId || !user) throw new Error('Usuário não autenticado.');
+      
+      const conn = connections.find((c) => c.id === connectionId);
+      if (!conn) throw new Error('Conexão não encontrada.');
+
+      const now = new Date().toISOString();
+      const partnerId = conn.members.find((m) => m !== userId);
+
+      await runTransaction(db, async (tx) => {
+        // 1. Cancel connection
+        const connRef = doc(db, 'shared_connections', connectionId);
+        tx.update(connRef, { status: 'cancelled', updatedAt: now });
+
+        // 2. Convert bills
+        const billsToConvert = sharedBills.filter((b) => b.members.includes(userId) && b.members.includes(partnerId!));
+        for (const bill of billsToConvert) {
+          // Logic: create personal bill equivalent
+          const billRef = doc(db, 'users', userId, 'bills', `bill_${bill.id}`);
+          const myShare = bill.shares[userId];
+          const amount = options.conversionRule === 'total' ? bill.amount : myShare.amount;
+          
+          tx.set(billRef, {
+            id: `bill_${bill.id}`,
+            userId,
+            name: bill.title,
+            amount,
+            dueDate: bill.dueDate,
+            dueDay: bill.dueDay,
+            category: bill.category,
+            recurrence: options.recurrenceScope === 'future' ? bill.recurrence : 'none',
+            startMonth: bill.month,
+            createdAt: now,
+            updatedAt: now,
+          });
+          
+          // Mark shared bill as hidden
+          const sBillRef = doc(db, 'shared_bills', bill.id);
+          tx.update(sBillRef, { hiddenForUsers: [...(bill.hiddenForUsers || []), userId] });
+        }
+      });
+    },
+    [userId, user, connections, sharedBills]
+  );
+
+  const memoizedSharedBills = useMemo(() => sharedBills.filter(b => !b.hiddenForUsers?.includes(userId!)), [sharedBills, userId]);
+  const memoizedSharedTransfers = useMemo(() => sharedTransfers.filter(t => !t.hiddenForUsers?.includes(userId!)), [sharedTransfers, userId]);
+
+  return useMemo(() => ({
     connections,
     activePartners,
     receivedInvitations,
     sentInvitations,
-    sharedBills,
-    sharedTransfers,
+    sharedBills: memoizedSharedBills,
+    sharedTransfers: memoizedSharedTransfers,
     sharedNotifications,
     unreadNotificationsCount,
     pendingReceivedInvitationsCount,
@@ -1435,11 +1526,46 @@ export function useSharedAccounts() {
     settleReimbursement,
     deleteSharedBill,
     deleteSharedBillOccurrence,
-    toggleSharePaid,
+    toggleMySharePaid,
     markNotificationRead,
     markAllNotificationsRead,
-  };
+    clearNotifications,
+    clearTransfers,
+    stopSharingAndConvert,
+  }), [
+    connections,
+    activePartners,
+    receivedInvitations,
+    sentInvitations,
+    memoizedSharedBills,
+    memoizedSharedTransfers,
+    sharedNotifications,
+    unreadNotificationsCount,
+    pendingReceivedInvitationsCount,
+    loading,
+    isProcessing,
+    searchUserByEmail,
+    sendInvitation,
+    respondInvitation,
+    createSharedBill,
+    updateSharedBill,
+    respondShareBillRequest,
+    transferShares,
+    payFullBillToCreditor,
+    settleReimbursement,
+    deleteSharedBill,
+    deleteSharedBillOccurrence,
+    toggleMySharePaid,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications,
+    clearTransfers,
+    stopSharingAndConvert
+  ]);
 }
+
+
+
 
 // ==========================================
 // Firestore Error Handling
