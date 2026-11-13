@@ -17,6 +17,7 @@ import {
   orderBy,
   getDocs,
   writeBatch,
+  increment,
 } from 'firebase/firestore';
 
 function sanitizeFirestorePayload<T extends Record<string, any>>(obj: T): Record<string, any> {
@@ -518,10 +519,13 @@ export function useAccounts() {
         return list;
       });
 
+      // Use an atomic Firestore increment: sequential adjustments can share a stale
+      // React render snapshot, so writing a calculated absolute balance can overwrite
+      // the previous adjustment (for example, when editing an existing transaction).
       await setDoc(
         doc(db, 'users', user.uid, 'accounts', accountId),
         sanitizeFirestorePayload({
-          currentBalance: (acc.currentBalance || 0) + amountDelta,
+          currentBalance: increment(amountDelta),
           updatedAt: now,
         }),
         { merge: true }
