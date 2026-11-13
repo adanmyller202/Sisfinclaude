@@ -1695,25 +1695,40 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         }}
         onUpdateIncome={async (id, partial) => {
           const oldInc = incomes.find((i) => i.id === id);
-          if (oldInc) {
-            if (oldInc.accountDistributions && oldInc.accountDistributions.length > 0) {
-              for (const dist of oldInc.accountDistributions) {
-                await adjustAccountBalanceForFinancialItem(dist.accountId, -dist.amount);
-              }
-            } else if (oldInc.accountId) {
-              await adjustAccountBalanceForFinancialItem(oldInc.accountId, -oldInc.amount);
-            }
-          }
           await updateIncome(id, partial);
-          const newDists = partial.accountDistributions;
-          const newAccountId = partial.accountId;
-          const newAmount = partial.amount ?? oldInc?.amount ?? 0;
-          if (newDists && newDists.length > 0) {
-            for (const dist of newDists) {
-              await adjustAccountBalanceForFinancialItem(dist.accountId, +dist.amount);
-            }
-          } else if (newAccountId) {
-            await adjustAccountBalanceForFinancialItem(newAccountId, +newAmount);
+          if (!oldInc) return;
+
+          // Reconcile only the net difference per account. Editing a note/name must
+          // never reverse and re-apply the full income amount.
+          const oldAllocations = new Map<string, number>();
+          const newAllocations = new Map<string, number>();
+          const addAllocation = (map: Map<string, number>, accountId: string | undefined, amount: number) => {
+            if (accountId && amount > 0) map.set(accountId, (map.get(accountId) || 0) + amount);
+          };
+
+          if (oldInc.accountDistributions?.length) {
+            oldInc.accountDistributions.forEach((d) => addAllocation(oldAllocations, d.accountId, d.amount));
+          } else {
+            addAllocation(oldAllocations, oldInc.accountId, oldInc.amount);
+          }
+
+          const nextAmount = partial.amount ?? oldInc.amount;
+          const hasDistributions = Object.prototype.hasOwnProperty.call(partial, 'accountDistributions');
+          const hasAccount = Object.prototype.hasOwnProperty.call(partial, 'accountId');
+          if (hasDistributions && partial.accountDistributions?.length) {
+            partial.accountDistributions.forEach((d) => addAllocation(newAllocations, d.accountId, d.amount));
+          } else if (hasDistributions || hasAccount) {
+            addAllocation(newAllocations, partial.accountId, nextAmount);
+          } else if (oldInc.accountDistributions?.length) {
+            oldInc.accountDistributions.forEach((d) => addAllocation(newAllocations, d.accountId, d.amount));
+          } else {
+            addAllocation(newAllocations, oldInc.accountId, nextAmount);
+          }
+
+          const accountIds = new Set([...oldAllocations.keys(), ...newAllocations.keys()]);
+          for (const accountId of accountIds) {
+            const delta = (newAllocations.get(accountId) || 0) - (oldAllocations.get(accountId) || 0);
+            if (delta !== 0) await adjustAccountBalanceForFinancialItem(accountId, delta);
           }
         }}
         onDeleteIncome={async (id) => {
@@ -1738,14 +1753,28 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         }}
         onUpdateExpense={async (id, partial) => {
           const oldExp = expenses.find((e) => e.id === id);
-          if (oldExp && oldExp.accountId) {
-            await adjustAccountBalanceForFinancialItem(oldExp.accountId, +oldExp.amount);
-          }
           await updateExpense(id, partial);
-          const newAccId = partial.accountId !== undefined ? partial.accountId : oldExp?.accountId;
-          const newAmt = partial.amount !== undefined ? partial.amount : oldExp?.amount ?? 0;
-          if (newAccId) {
-            await adjustAccountBalanceForFinancialItem(newAccId, -newAmt);
+          if (!oldExp) return;
+
+          // Apply only the actual ledger difference. A description/category/notes-only
+          // edit has a zero delta and therefore cannot change the account balance.
+          const nextAccountId = Object.prototype.hasOwnProperty.call(partial, 'accountId')
+            ? partial.accountId
+            : oldExp.accountId;
+          const nextAmount = partial.amount ?? oldExp.amount;
+
+          if (oldExp.accountId === nextAccountId) {
+            const delta = oldExp.amount - nextAmount;
+            if (oldExp.accountId && delta !== 0) {
+              await adjustAccountBalanceForFinancialItem(oldExp.accountId, delta);
+            }
+          } else {
+            if (oldExp.accountId && oldExp.amount !== 0) {
+              await adjustAccountBalanceForFinancialItem(oldExp.accountId, oldExp.amount);
+            }
+            if (nextAccountId && nextAmount !== 0) {
+              await adjustAccountBalanceForFinancialItem(nextAccountId, -nextAmount);
+            }
           }
         }}
         onDeleteExpense={async (id) => {
