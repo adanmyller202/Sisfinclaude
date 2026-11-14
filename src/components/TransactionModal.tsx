@@ -309,6 +309,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       return;
     }
 
+    // Editing an existing financial item must never fall through to a create
+    // operation, even if the user changes the modal's transaction tab.
+    if (activeEditing && activeEditing.type !== type) {
+      setError('Para evitar duplicações, feche esta edição e abra um novo lançamento para criar outro tipo de transação.');
+      return;
+    }
+
     const day = date && date.includes('-') ? parseInt(date.split('-')[2], 10) || 1 : 1;
     const startMonth = date.substring(0, 7);
     let recurrenceMonthsCount = 0;
