@@ -321,8 +321,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       recurrenceMonthsCount = parsedM;
     }
 
-    // Synchronous lock prevents double taps from executing two balance mutations.
-    submitLockRef.current = true;
     if (type === 'bill') {
       const payload: Omit<BillItem, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
         name: name.trim(),
@@ -343,6 +341,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         return;
       }
 
+      submitLockRef.current = true; // Lock synchronously before any async balance write.
       try {
         setIsSubmitting(true);
         if (activeEditing && activeEditing.type === 'bill') {
@@ -375,6 +374,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         accountId: selectedAccountId || undefined,
       };
 
+      submitLockRef.current = true; // Lock synchronously before any async balance write.
       try {
         setIsSubmitting(true);
         if (activeEditing && activeEditing.type === 'expense') {
@@ -442,6 +442,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         startMonth,
       };
 
+      submitLockRef.current = true; // Lock synchronously before any async balance write.
       try {
         setIsSubmitting(true);
         if (activeEditing && activeEditing.type === 'income') {
