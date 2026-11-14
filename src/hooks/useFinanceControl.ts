@@ -395,6 +395,22 @@ export function useFinanceControl(externalSharedBills?: SharedBill[]) {
         updatedAt: now,
       };
 
+      // When a recurring bill is split at the selected month, carry that
+      // month's completion record to the new series. Otherwise a bill already
+      // marked as paid becomes pending again and can be counted a second time.
+      const oldStatusId = `bill_${billId}_${targetMonth}`;
+      const newStatusId = `bill_${newBillId}_${targetMonth}`;
+      const existingTargetStatus = statusRecords.find((record) => record.id === oldStatusId);
+      const migratedStatus: MonthlyStatusRecord | null = existingTargetStatus
+        ? {
+            ...existingTargetStatus,
+            id: newStatusId,
+            itemId: newBillId,
+            itemType: 'bill',
+            month: targetMonth,
+          }
+        : null;
+
       setBills((prev) => {
         const updated = [
           ...prev.map((b) => (b.id === billId ? { ...b, ...cappedOriginal } : b)),
@@ -406,6 +422,19 @@ export function useFinanceControl(externalSharedBills?: SharedBill[]) {
         return updated;
       });
 
+      if (migratedStatus) {
+        setStatusRecords((prev) => {
+          const updated = [
+            ...prev.filter((record) => record.id !== oldStatusId && record.id !== newStatusId),
+            migratedStatus,
+          ];
+          try {
+            localStorage.setItem(getLocalKey('status'), JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+
       registerPendingWrite();
       try {
         const oldRef = doc(db, 'users', userId, 'bills', billId);
@@ -413,13 +442,20 @@ export function useFinanceControl(externalSharedBills?: SharedBill[]) {
 
         const newRef = doc(db, 'users', userId, 'bills', newBillId);
         await setDoc(newRef, sanitizeForFirestore(newBill));
+
+        if (migratedStatus) {
+          const oldStatusRef = doc(db, 'users', userId, 'monthly_status', oldStatusId);
+          const newStatusRef = doc(db, 'users', userId, 'monthly_status', newStatusId);
+          await deleteDoc(oldStatusRef);
+          await setDoc(newStatusRef, sanitizeForFirestore(migratedStatus));
+        }
       } catch (err) {
         console.warn('Bill recurrence split locally, will sync when online:', err);
       } finally {
         registerResolvedWrite();
       }
     },
-    [userId, bills, updateBill, getLocalKey]
+    [userId, bills, statusRecords, updateBill, getLocalKey]
   );
 
   // Delete bill occurrence (this month vs this and all future)
