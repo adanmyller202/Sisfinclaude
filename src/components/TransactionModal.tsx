@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   CurrencyCode,
@@ -130,6 +130,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   // Status & Errors
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   // Quick inline category creation
@@ -279,7 +280,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (submitLockRef.current || isSubmitting) return;
     setError(null);
 
     const val = parseFloat(amountStr.replace(',', '.'));
@@ -320,6 +321,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       recurrenceMonthsCount = parsedM;
     }
 
+    // Synchronous lock prevents double taps from executing two balance mutations.
+    submitLockRef.current = true;
     if (type === 'bill') {
       const payload: Omit<BillItem, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
         name: name.trim(),
@@ -357,6 +360,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setError(err instanceof Error ? err.message : 'Falha ao salvar a fatura.');
       } finally {
         setIsSubmitting(false);
+        submitLockRef.current = false;
       }
       return;
     }
@@ -388,6 +392,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setError(err instanceof Error ? err.message : 'Falha ao salvar despesa.');
       } finally {
         setIsSubmitting(false);
+        submitLockRef.current = false;
       }
       return;
     }
@@ -454,6 +459,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setError(err instanceof Error ? err.message : 'Falha ao salvar receita.');
       } finally {
         setIsSubmitting(false);
+        submitLockRef.current = false;
       }
       return;
     }
