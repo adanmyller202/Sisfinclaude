@@ -1699,8 +1699,15 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         }}
         onUpdateIncome={async (id, partial) => {
           const oldInc = incomes.find((i) => i.id === id);
+          const wasReceived = statusRecords.some(
+            (record) => record.id === `income_${id}_${selectedMonth}` && record.isCompleted === true
+          );
           await updateIncome(id, partial);
-          if (!oldInc) return;
+
+          // An income affects the real account balance only for a month in which
+          // it was already marked as received. Pending income is forecast-only.
+          // Metadata edits must never post money into an account.
+          if (!oldInc || !wasReceived) return;
 
           // Reconcile only the net difference per account. Editing a note/name must
           // never reverse and re-apply the full income amount.
