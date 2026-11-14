@@ -186,14 +186,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             distMap[d.accountId] = String(d.amount);
           });
           setIncomeDistributions(distMap);
-          setSelectedAccountId(item.accountId || activeAccounts[0]?.id || '');
+          setSelectedAccountId(item.accountId || '');
         } else if (item.accountId) {
           setIncomeDistMode('single');
           setSelectedAccountId(item.accountId);
           setIncomeDistributions({});
         } else {
           setIncomeDistMode('single');
-          setSelectedAccountId(activeAccounts[0]?.id || '');
+          setSelectedAccountId('');
           setIncomeDistributions({});
         }
 
