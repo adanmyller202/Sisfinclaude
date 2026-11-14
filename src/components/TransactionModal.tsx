@@ -247,7 +247,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setShowRecurrencePrompt(false);
       setPendingBillPayload(null);
     }
-  }, [isOpen, editingTransaction, initialType, defaultDate, activeAccounts]);
+  }, [isOpen, editingTransaction, editingItem, initialType, defaultDate, activeAccounts]);
 
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
@@ -279,6 +279,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
 
     const val = parseFloat(amountStr.replace(',', '.'));
@@ -333,7 +334,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         startMonth,
       };
 
-      if (editingTransaction && editingTransaction.type === 'bill' && (editingTransaction.item as BillItem).recurrence === 'monthly' && onUpdateBillOccurrence) {
+      if (activeEditing && activeEditing.type === 'bill' && (activeEditing.item as BillItem).recurrence === 'monthly' && onUpdateBillOccurrence) {
         setPendingBillPayload(payload);
         setShowRecurrencePrompt(true);
         return;
@@ -341,12 +342,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       try {
         setIsSubmitting(true);
-        if (editingTransaction && editingTransaction.type === 'bill' && onUpdateBill) {
-          await onUpdateBill(editingTransaction.id, payload);
+        if (activeEditing && activeEditing.type === 'bill') {
+          if (!onUpdateBill) throw new Error('Não foi possível atualizar esta fatura: função de edição indisponível.');
+          await onUpdateBill(activeEditing.id, payload);
         } else {
-          if (editingTransaction && editingTransaction.type !== 'bill') {
-            if (editingTransaction.type === 'expense' && onDeleteExpense) await onDeleteExpense(editingTransaction.id);
-            else if (editingTransaction.type === 'income' && onDeleteIncome) await onDeleteIncome(editingTransaction.id);
+          if (activeEditing && activeEditing.type !== 'bill') {
+            if (activeEditing.type === 'expense' && onDeleteExpense) await onDeleteExpense(activeEditing.id);
+            else if (activeEditing.type === 'income' && onDeleteIncome) await onDeleteIncome(activeEditing.id);
           }
           await onSaveBill(payload);
         }
@@ -371,12 +373,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       try {
         setIsSubmitting(true);
-        if (editingTransaction && editingTransaction.type === 'expense' && onUpdateExpense) {
-          await onUpdateExpense(editingTransaction.id, payload);
+        if (activeEditing && activeEditing.type === 'expense') {
+          if (!onUpdateExpense) throw new Error('Não foi possível atualizar esta despesa: função de edição indisponível.');
+          await onUpdateExpense(activeEditing.id, payload);
         } else {
-          if (editingTransaction && editingTransaction.type !== 'expense') {
-            if (editingTransaction.type === 'bill' && onDeleteBill) await onDeleteBill(editingTransaction.id);
-            else if (editingTransaction.type === 'income' && onDeleteIncome) await onDeleteIncome(editingTransaction.id);
+          if (activeEditing && activeEditing.type !== 'expense') {
+            if (activeEditing.type === 'bill' && onDeleteBill) await onDeleteBill(activeEditing.id);
+            else if (activeEditing.type === 'income' && onDeleteIncome) await onDeleteIncome(activeEditing.id);
           }
           await onSaveExpense(payload);
         }
@@ -436,12 +439,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       try {
         setIsSubmitting(true);
-        if (editingTransaction && editingTransaction.type === 'income' && onUpdateIncome) {
-          await onUpdateIncome(editingTransaction.id, payload);
+        if (activeEditing && activeEditing.type === 'income') {
+          if (!onUpdateIncome) throw new Error('Não foi possível atualizar esta receita: função de edição indisponível.');
+          await onUpdateIncome(activeEditing.id, payload);
         } else {
-          if (editingTransaction && editingTransaction.type !== 'income') {
-            if (editingTransaction.type === 'bill' && onDeleteBill) await onDeleteBill(editingTransaction.id);
-            else if (editingTransaction.type === 'expense' && onDeleteExpense) await onDeleteExpense(editingTransaction.id);
+          if (activeEditing && activeEditing.type !== 'income') {
+            if (activeEditing.type === 'bill' && onDeleteBill) await onDeleteBill(activeEditing.id);
+            else if (activeEditing.type === 'expense' && onDeleteExpense) await onDeleteExpense(activeEditing.id);
           }
           await onSaveIncome(payload);
         }
