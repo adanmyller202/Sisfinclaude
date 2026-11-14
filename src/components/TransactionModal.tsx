@@ -467,8 +467,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const handleApplyRecurrenceEdit = async (scope: 'this' | 'this_and_future') => {
-    if (!activeEditing || activeEditing.type !== 'bill' || !pendingBillPayload || !onUpdateBillOccurrence || isSubmitting) return;
+    if (!activeEditing || activeEditing.type !== 'bill' || !pendingBillPayload || !onUpdateBillOccurrence || submitLockRef.current || isSubmitting) return;
     const targetMonth = selectedMonth || pendingBillPayload.dueDate.substring(0, 7);
+    submitLockRef.current = true;
     try {
       setIsSubmitting(true);
       await onUpdateBillOccurrence(activeEditing.id, targetMonth, pendingBillPayload, scope);
@@ -478,6 +479,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setError(err instanceof Error ? err.message : 'Falha ao atualizar fatura parcelada.');
     } finally {
       setIsSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
