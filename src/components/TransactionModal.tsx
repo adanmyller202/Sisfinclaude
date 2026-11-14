@@ -460,11 +460,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const handleApplyRecurrenceEdit = async (scope: 'this' | 'this_and_future') => {
-    if (!editingTransaction || !pendingBillPayload || !onUpdateBillOccurrence) return;
+    if (!activeEditing || activeEditing.type !== 'bill' || !pendingBillPayload || !onUpdateBillOccurrence || isSubmitting) return;
     const targetMonth = selectedMonth || pendingBillPayload.dueDate.substring(0, 7);
     try {
       setIsSubmitting(true);
-      await onUpdateBillOccurrence(editingTransaction.id, targetMonth, pendingBillPayload, scope);
+      await onUpdateBillOccurrence(activeEditing.id, targetMonth, pendingBillPayload, scope);
       setShowRecurrencePrompt(false);
       onClose();
     } catch (err: unknown) {
