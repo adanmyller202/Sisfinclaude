@@ -1678,11 +1678,15 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         editingTransaction={editingTx}
         getCategoriesFor={getCategoriesFor}
         onAddCategory={addCategory}
-        onSaveBill={addBill}
+        onSaveBill={async (data) => {
+          if (editingTx?.type === 'bill') throw new Error('Esta fatura já existe. A edição não pode criar uma segunda fatura.');
+          return addBill(data);
+        }}
         onUpdateBill={updateBill}
         onUpdateBillOccurrence={updateBillOccurrence}
         onDeleteBill={deleteBill}
         onSaveIncome={async (data) => {
+          if (editingTx?.type === 'income') throw new Error('Esta receita já existe. A edição não pode criar uma segunda receita.');
           const res = await addIncome(data);
           if (data.accountDistributions && data.accountDistributions.length > 0) {
             for (const dist of data.accountDistributions) {
@@ -1745,6 +1749,7 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
           await deleteIncome(id);
         }}
         onSaveExpense={async (data) => {
+          if (editingTx?.type === 'expense') throw new Error('Esta despesa já existe. A edição não pode criar uma segunda despesa.');
           const res = await addExpense(data);
           if (data.accountId) {
             await adjustAccountBalanceForFinancialItem(data.accountId, -data.amount);
